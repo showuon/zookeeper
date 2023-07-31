@@ -31,6 +31,7 @@ import java.net.SocketAddress;
 import java.net.SocketException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -312,7 +313,10 @@ public class Leader extends LearnerMaster {
                 serverSocket = new ServerSocket();
             }
             serverSocket.setReuseAddress(true);
-            serverSocket.bind(address);
+
+            LOG.info("[Luke] current address:" + address + ", after re-resolve:" + new InetSocketAddress(address.getHostString(), address.getPort()));
+            serverSocket.bind(new InetSocketAddress(address.getHostString(), address.getPort()));
+
             return Optional.of(serverSocket);
         } catch (IOException e) {
             LOG.error("Couldn't bind to {}", address.toString(), e);
@@ -834,6 +838,12 @@ public class Leader extends LearnerMaster {
        }
     }
 
+    private MultipleAddresses recreateSocketAddresses(MultipleAddresses addr) {
+        return new MultipleAddresses(addr.getAllAddresses().stream()
+                .map(address -> new InetSocketAddress(address.getHostString(), address.getPort()))
+                .collect(Collectors.toSet()));
+    }
+
     /** In a reconfig operation, this method attempts to find the best leader for next configuration.
      *  If the current leader is a voter in the next configuartion, then it remains the leader.
      *  Otherwise, choose one of the new voters that acked the reconfiguartion, such that it is as
@@ -851,7 +861,8 @@ public class Leader extends LearnerMaster {
         //check if I'm in the new configuration with the same quorum address -
         // if so, I'll remain the leader
         if (newQVAcksetPair.getQuorumVerifier().getVotingMembers().containsKey(self.getId())
-            && newQVAcksetPair.getQuorumVerifier().getVotingMembers().get(self.getId()).addr.equals(self.getQuorumAddress())) {
+            && recreateSocketAddresses(newQVAcksetPair.getQuorumVerifier().getVotingMembers().get(self.getId()).addr)
+                .equals(recreateSocketAddresses(self.getQuorumAddress()))) {
             return self.getId();
         }
         // start with an initial set of candidates that are voters from new config that

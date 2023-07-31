@@ -2168,6 +2168,14 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
         writeLongToFile(ACCEPTED_EPOCH_FILENAME, e);
         acceptedEpoch = e;
     }
+    
+    private void recreateSocketAddressesFromQV(QuorumVerifier qv) {
+         LOG.info("[Luke] recreateSocketAddressesFromQV:" + qv);
+         for (QuorumServer qs : qv.getAllMembers().values()) {
+             qs.recreateSocketAddresses();
+         }
+        LOG.info("[Luke] after recreateSocketAddressesFromQV:" + qv);
+    }
 
     public boolean processReconfig(QuorumVerifier qv, Long suggestedLeaderId, Long zxid, boolean restartLE) {
         if (!isReconfigEnabled()) {
@@ -2190,6 +2198,9 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
         // already a Follower/Observer, only
         // for Learner):
         initConfigInZKDatabase();
+
+        recreateSocketAddressesFromQV(prevQV);
+        recreateSocketAddressesFromQV(qv);
 
         if (prevQV.getVersion() < qv.getVersion() && !prevQV.equals(qv)) {
             Map<Long, QuorumServer> newMembers = qv.getAllMembers();
